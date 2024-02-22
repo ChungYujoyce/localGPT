@@ -37,7 +37,7 @@ def load_single_document(file_path: str) -> Document:
         else:
             file_log(file_path + " document type is undefined.")
             raise ValueError("Document type is undefined")
-        return loader.load()[0]
+        return loader.load()
     except Exception as ex:
         file_log("%s loading error: \n%s" % (file_path, ex))
         return None
@@ -102,16 +102,14 @@ def load_documents(source_dir: str) -> list[Document]:
 
 def split_documents(documents: list[Document]) -> tuple[list[Document], list[Document]]:
     # Splits documents for correct Text Splitter
-    text_docs, python_docs = [], []
+    text_docs = []
     for doc in documents:
         if doc is not None:
-            file_extension = os.path.splitext(doc.metadata["source"])[1]
-            if file_extension == ".py":
-                python_docs.append(doc)
+            if isinstance(doc, list):
+                text_docs += doc
             else:
                 text_docs.append(doc)
-    return text_docs, python_docs
-
+    return text_docs
 
 @click.command()
 @click.option(
@@ -146,13 +144,10 @@ def main(device_type):
     # Load documents and split in chunks
     logging.info(f"Loading documents from {SOURCE_DIRECTORY}")
     documents = load_documents(SOURCE_DIRECTORY)
-    text_documents, python_documents = split_documents(documents)
+    text_documents = split_documents(documents)
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    python_splitter = RecursiveCharacterTextSplitter.from_language(
-        language=Language.PYTHON, chunk_size=880, chunk_overlap=200
-    )
     texts = text_splitter.split_documents(text_documents)
-    texts.extend(python_splitter.split_documents(python_documents))
+    # List['langchain.schema.document.Document']
     logging.info(f"Loaded {len(documents)} documents from {SOURCE_DIRECTORY}")
     logging.info(f"Split into {len(texts)} chunks of text")
 

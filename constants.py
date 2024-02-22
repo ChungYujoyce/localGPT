@@ -4,7 +4,7 @@ import os
 from chromadb.config import Settings
 
 # https://python.langchain.com/en/latest/modules/indexes/document_loaders/examples/excel.html?highlight=xlsx#microsoft-excel
-from langchain.document_loaders import CSVLoader, PDFMinerLoader, TextLoader, UnstructuredExcelLoader, Docx2txtLoader
+from langchain.document_loaders import CSVLoader, PyPDFLoader, PDFPlumberLoader, PDFMinerLoader, TextLoader, UnstructuredExcelLoader, Docx2txtLoader
 from langchain.document_loaders import UnstructuredFileLoader, UnstructuredMarkdownLoader
 from langchain.document_loaders import UnstructuredHTMLLoader
 
@@ -20,7 +20,7 @@ PERSIST_DIRECTORY = f"{ROOT_DIRECTORY}/DB"
 MODELS_PATH = "./models"
 
 # Can be changed to a specific number
-INGEST_THREADS = os.cpu_count() or 8
+INGEST_THREADS = 1
 
 # Define the Chroma settings
 CHROMA_SETTINGS = Settings(
@@ -44,27 +44,27 @@ N_BATCH = 512
 
 # https://python.langchain.com/en/latest/_modules/langchain/document_loaders/excel.html#UnstructuredExcelLoader
 DOCUMENT_MAP = {
-    ".html": UnstructuredHTMLLoader,
-    ".txt": TextLoader,
-    ".md": UnstructuredMarkdownLoader,
-    ".py": TextLoader,
-    # ".pdf": PDFMinerLoader,
-    ".pdf": UnstructuredFileLoader,
-    ".csv": CSVLoader,
-    ".xls": UnstructuredExcelLoader,
-    ".xlsx": UnstructuredExcelLoader,
-    ".docx": Docx2txtLoader,
-    ".doc": Docx2txtLoader,
+    # ".html": UnstructuredHTMLLoader,
+    # ".txt": TextLoader,
+    # ".md": UnstructuredMarkdownLoader,
+    # ".py": TextLoader,
+    ".pdf": PyPDFLoader,
+    # ".pdf": UnstructuredFileLoader,
+    # ".csv": CSVLoader,
+    # ".xls": UnstructuredExcelLoader,
+    # ".xlsx": UnstructuredExcelLoader,
+    # ".docx": Docx2txtLoader,
+    # ".doc": Docx2txtLoader,
 }
 
 # Default Instructor Model
-EMBEDDING_MODEL_NAME = "hkunlp/instructor-large"  # Uses 1.5 GB of VRAM (High Accuracy with lower VRAM usage)
+#EMBEDDING_MODEL_NAME = "hkunlp/instructor-large"  # Uses 1.5 GB of VRAM (High Accuracy with lower VRAM usage)
 
 ####
 #### OTHER EMBEDDING MODEL OPTIONS
 ####
 
-# EMBEDDING_MODEL_NAME = "hkunlp/instructor-xl" # Uses 5 GB of VRAM (Most Accurate of all models)
+EMBEDDING_MODEL_NAME = "hkunlp/instructor-xl" # Uses 5 GB of VRAM (Most Accurate of all models)
 # EMBEDDING_MODEL_NAME = "intfloat/e5-large-v2" # Uses 1.5 GB of VRAM (A little less accurate than instructor-large)
 # EMBEDDING_MODEL_NAME = "intfloat/e5-base-v2" # Uses 0.5 GB of VRAM (A good model for lower VRAM GPUs)
 # EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2" # Uses 0.2 GB of VRAM (Less accurate but fastest - only requires 150mb of vram)
