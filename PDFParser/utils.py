@@ -49,16 +49,29 @@ def extract_text_without_tables(p):
 
     # Get the bounding boxes of the tables on the page.
     bboxes = [table.bbox for table in p.find_tables(table_settings=ts)]
-
-    def not_within_bboxes(obj):
-        """Check if the object is in any of the table's bbox."""
-        def obj_in_bbox(_bbox):
-            """See https://github.com/jsvine/pdfplumber/blob/stable/pdfplumber/table.py#L404"""
-            v_mid = (obj["top"] + obj["bottom"]) / 2
-            h_mid = (obj["x0"] + obj["x1"]) / 2
-            x0, top, x1, bottom = _bbox
-            return (h_mid >= x0) and (h_mid < x1) and (v_mid >= top) and (v_mid < bottom)
-
-        return not any(obj_in_bbox(__bbox) for __bbox in bboxes)
+    if len(bboxes) > 0:
+        texts = ""
+        head = 0
+        for idx, __bbox in enumerate(bboxes):
+            x0, top, x1, bottom = __bbox
+            texts += p.crop((0, head, p.width, top), relative=False, strict=True).extract_text()
+            texts += f'<|table-{idx}|>'
+            head = bottom
+        texts += p.crop((0, head, p.width, p.height), relative=False, strict=True).extract_text()
+    else:
+        texts = p.extract_text()
+    return texts
     
-    return p.filter(not_within_bboxes).extract_text()
+    
+#     def not_within_bboxes(obj):
+#         """Check if the object is in any of the table's bbox."""
+#         def obj_in_bbox(_bbox):
+#             """See https://github.com/jsvine/pdfplumber/blob/stable/pdfplumber/table.py#L404"""
+#             v_mid = (obj["top"] + obj["bottom"]) / 2
+#             h_mid = (obj["x0"] + obj["x1"]) / 2
+#             x0, top, x1, bottom = _bbox
+#             return (h_mid >= x0) and (h_mid < x1) and (v_mid >= top) and (v_mid < bottom)
+
+#         return not any(obj_in_bbox(__bbox) for __bbox in bboxes)
+    
+#     return p.filter(not_within_bboxes).extract_text()

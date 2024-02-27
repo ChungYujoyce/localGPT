@@ -5,6 +5,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 import click
 import torch
 from langchain.docstore.document import Document
+from langchain.document_loaders import TextLoader
 from langchain.text_splitter import Language, RecursiveCharacterTextSplitter
 from langchain.vectorstores import Chroma
 from utils import get_embeddings
@@ -142,14 +143,18 @@ def split_documents(documents: list[Document]) -> tuple[list[Document], list[Doc
 )
 def main(device_type):
     # Load documents and split in chunks
-    logging.info(f"Loading documents from {SOURCE_DIRECTORY}")
-    documents = load_documents(SOURCE_DIRECTORY)
-    text_documents = split_documents(documents)
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    texts = text_splitter.split_documents(text_documents)
-    # List['langchain.schema.document.Document']
-    logging.info(f"Loaded {len(documents)} documents from {SOURCE_DIRECTORY}")
-    logging.info(f"Split into {len(texts)} chunks of text")
+    # logging.info(f"Loading documents from {SOURCE_DIRECTORY}")
+    # documents = load_documents(SOURCE_DIRECTORY)
+    # text_documents = split_documents(documents)
+    # # All pages 
+    # # langchain Document {page_content: str, metadata: dict}
+    # import pdb
+    # pdb.set_trace()
+    # text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    # texts = text_splitter.split_documents(text_documents)
+    # # List['langchain.schema.document.Document']
+    # logging.info(f"Loaded {len(documents)} documents from {SOURCE_DIRECTORY}")
+    # logging.info(f"Split into {len(texts)} chunks of text")
 
     """
     (1) Chooses an appropriate langchain library based on the enbedding model name.  Matching code is contained within fun_localGPT.py.
@@ -157,13 +162,20 @@ def main(device_type):
     (2) Provides additional arguments for instructor and BGE models to improve results, pursuant to the instructions contained on
     their respective huggingface repository, project page or github repository.
     """
-
+    PARSED_DIRECTORY = f'/PARSED_DOCUMENTS'
+    paragraph_path = '/home/chsieh/joyce/localGPT/PDFParser/PARSED_DOCUMENTS/Solution-Brief_Rack_Scale_AI/paragraphs'
+    doc_list = []
+    for root, _, files in os.walk(paragraph_path):
+        for file in files:
+            file = os.path.join(root, file)
+            loader = TextLoader(file)
+            documents = loader.load()
+            doc_list += documents
     embeddings = get_embeddings(device_type)
 
     logging.info(f"Loaded embeddings from {EMBEDDING_MODEL_NAME}")
-
     db = Chroma.from_documents(
-        texts,
+        doc_list,
         embeddings,
         persist_directory=PERSIST_DIRECTORY,
         client_settings=CHROMA_SETTINGS,
