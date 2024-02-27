@@ -30,7 +30,7 @@ def split_contexts(context: str, chunk_size=1000, overlap=False):
 ''' Refers to: https://github.com/jsvine/pdfplumber/issues/242
     Parse PDFs excluding tables.
 '''
-def extract_text_without_tables(p):
+def extract_text_without_tables(p, page_idx):
     def curves_to_edges(cs):
         """See https://github.com/jsvine/pdfplumber/issues/127"""
         edges = []
@@ -55,7 +55,7 @@ def extract_text_without_tables(p):
         for idx, __bbox in enumerate(bboxes):
             x0, top, x1, bottom = __bbox
             texts += p.crop((0, head, p.width, top), relative=False, strict=True).extract_text()
-            texts += f'<|table-{idx}|>'
+            texts += f'<|page-{page_idx}-table-{idx}|>'
             head = bottom
         texts += p.crop((0, head, p.width, p.height), relative=False, strict=True).extract_text()
     else:

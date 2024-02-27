@@ -51,18 +51,20 @@ def text_to_chunk(source_dir, dis_dir):
     pages = loader.load_and_split()
     pdf = pdfplumber.open(source_dir)
     text = ""
-    for i in range(len(pages)):
-        single_text = str(extract_text_without_tables(pdf.pages[i]))
+    for page_idx in range(len(pages)):
+        single_text = str(extract_text_without_tables(pdf.pages[page_idx], page_idx+1))
         text += single_text
-        print(f'Page: {i}')
+        print(f'Page: {page_idx}')
         print(single_text)
         import pdb
         pdb.set_trace()
         
     ## [TODO]
-    ## 1. filter(text): Rule based filter, e.g. © 2023 Copyright Super Micro Computer, Inc. All rights reserved June, 2023 6
+    ## 1. find_table_chunk(text): Chunk table out with raw text beforehand. e.g. <|table-{idx}|>
+    
+    ## 2. filter(text): Rule based filter, e.g. © 2023 Copyright Super Micro Computer, Inc. All rights reserved June, 2023 6
 
-    ## 2. find_table(text): Chunk table out  e.g. <|table-{idx}|>
+    
     
     ## 3. the last things (may split out as another function)
     texts = split_contexts(text, chunk_size=300, overlap=False)
