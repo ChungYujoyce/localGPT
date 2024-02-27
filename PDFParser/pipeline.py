@@ -61,6 +61,7 @@ def text_to_chunk(source_dir, dis_dir):
         
     ## [TODO]
     ## 1. find_table_chunk(text): Chunk table out with raw text beforehand. e.g. <|table-{idx}|>
+    ## The page has the table and we split the above area of bottom tables to a chunk.
     
     ## 2. filter(text): Rule based filter, e.g. © 2023 Copyright Super Micro Computer, Inc. All rights reserved June, 2023 6
 
