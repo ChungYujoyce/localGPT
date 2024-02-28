@@ -1,5 +1,7 @@
 import pdfplumber
-from nltk.tokenize import sent_tokenize
+# import nltk
+# nltk.download('punkt')
+# from nltk.tokenize import sent_tokenize
 
 def split_contexts(context: str, chunk_size=1000, overlap=False):
     all_chunks = []
@@ -27,9 +29,7 @@ def split_contexts(context: str, chunk_size=1000, overlap=False):
         
     return all_chunks
 
-''' Refers to: https://github.com/jsvine/pdfplumber/issues/242
-    Parse PDFs excluding tables.
-'''
+#Parse PDFs excluding tables.
 def extract_text_without_tables(p, page_idx):
     def curves_to_edges(cs):
         """See https://github.com/jsvine/pdfplumber/issues/127"""
@@ -49,18 +49,18 @@ def extract_text_without_tables(p, page_idx):
 
     # Get the bounding boxes of the tables on the page.
     bboxes = [table.bbox for table in p.find_tables(table_settings=ts)]
+    table_texts, raw_texts = "", ""
     if len(bboxes) > 0:
-        texts = ""
         head = 0
         for idx, __bbox in enumerate(bboxes):
             x0, top, x1, bottom = __bbox
-            texts += p.crop((0, head, p.width, top), relative=False, strict=True).extract_text()
-            texts += f'<|page-{page_idx}-table-{idx}|>'
+            table_texts += p.crop((0, head, p.width, top), relative=False, strict=True).extract_text()
+            table_texts += f'<|page_{page_idx}_table_{idx+1}|>'
             head = bottom
-        texts += p.crop((0, head, p.width, p.height), relative=False, strict=True).extract_text()
+        raw_texts = p.crop((0, head, p.width, p.height), relative=False, strict=True).extract_text()
     else:
-        texts = p.extract_text()
-    return texts
+        raw_texts = p.extract_text()
+    return table_texts, raw_texts
     
     
 #     def not_within_bboxes(obj):

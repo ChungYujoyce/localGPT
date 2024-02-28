@@ -1,18 +1,18 @@
 import os, logging, shutil
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
-from langchain.document_loaders import PyPDFLoader, TextLoader
+from langchain.document_loaders import PDFPlumberLoader, TextLoader
 from utils import extract_text_without_tables, split_contexts
 from pdf2image import convert_from_path
 from pathlib import Path
 from ocr import OCR
-import csv
+import csv, re
 import pdfplumber
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 #ROOT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-ROOT_DIRECTORY = '/home/chsieh/joyce/localGPT/PDFParser'
-SOURCE_DIRECTORY = '/home/chsieh/joyce/localGPT/SOURCE_DOCUMENTS'
+ROOT_DIRECTORY = '/home/joyce/localGPT/PDFParser'
+SOURCE_DIRECTORY = '/home/joyce/localGPT/SOURCE_DOCUMENTS'
 PARSED_DIRECTORY = f'{os.getcwd()}/PARSED_DOCUMENTS'
 
 # Step 1: PDF to Image transformation
@@ -44,49 +44,70 @@ def img_to_table(source_dir, dis_dir):
                     for k, v in table_data.items():
                         wr.writerow(v)
                 # table output csv postprocess
-                
-                        
-def text_to_chunk(source_dir, dis_dir):  
-    loader = PyPDFLoader(source_dir)
-    pages = loader.load_and_split()
-    pdf = pdfplumber.open(source_dir)
-    text = ""
-    for page_idx in range(len(pages)):
-        single_text = str(extract_text_without_tables(pdf.pages[page_idx], page_idx+1))
-        text += single_text
-        print(f'Page: {page_idx}')
-        print(single_text)
-        import pdb
-        pdb.set_trace()
-        
-    ## [TODO]
-    ## 1. find_table_chunk(text): Chunk table out with raw text beforehand. e.g. <|table-{idx}|>
-    ## The page has the table and we split the above area of bottom tables to a chunk.
-    
-    ## 2. filter(text): Rule based filter, e.g. © 2023 Copyright Super Micro Computer, Inc. All rights reserved June, 2023 6
 
-    
+def text_filter(text):
+    # take off copyright line
+    idx = re.search(r"©", text).span()[0]
+    return text[:idx]
+                        
+def text_to_chunk(pdf_dir, table_dir, dis_dir):  
+
+    loader = PDFPlumberLoader(pdf_dir)
+    pages = loader.load_and_split()
+
+    table_list = []
+    for root, _, files in os.walk(table_dir):
+        for file in files:
+            if file.split('.')[1] == 'txt':
+                table_list.append(os.path.join(root, file))
+
+    chunks = []
+    for page_idx in range(len(pages)):
+        text = ""
+        table_text, raw_text = extract_text_without_tables(pages[page_idx], page_idx+1)
+        if table_text:
+            for table in table_list:
+                table_name = table.split('.')[0].split('/')[-1]
+                if table_text.find(table_name) != -1:
+                    table_content = open(table, "r").read()
+                    new_text = table_text.replace("<|" + table_name + "|>", table_content)
+                    table_text = new_text
+                    table_list.remove(table)
+            text += table_text
+
+        text += raw_text
+        clean_text = text_filter(text)
+
+        chunks += split_contexts(clean_text, chunk_size=300, overlap=False)
+
+    for i in range(1, len(chunks)):
+        concat = []
+        if len(chunks[i]) == 1 and len(chunks[i-1]) == 1:
+            texts = str(chunks[i-1]) + str(chunks[i])
+            concat = split_contexts(texts, chunk_size=300, overlap=False)
+        if len(concat) == 1:
+            chunks[i-1] = concat[0]
+            chunks[i] = ""
+            if i < len(chunks) - 1:
+                i += 1
+
+    final_chunks = [c for c in chunks if c != ""]
+
+    ## [TODO]
+    ## 1. shrink chunk size if possible
     
     ## 3. the last things (may split out as another function)
-    texts = split_contexts(text, chunk_size=300, overlap=False)
-    for i in range(len(texts)):
-        with open(f'{dis_dir}/chunk_{i+1}.txt', 'w', encoding='utf-8') as f:
-            f.write(texts[i])
 
-def table_to_chunk(source_dir, dis_dir):
+    for i in range(len(final_chunks)):
+        with open(f'{dis_dir}/chunk_{i+1}.txt', 'w', encoding='utf-8') as f:
+            f.write(final_chunks[i])
+
+def table_to_txt(source_dir, dis_dir):
     for root, _, files in os.walk(source_dir):
         for file in files:
             file_name = file.split('.')[0]
             if file.split('.')[1] == 'csv':
                 shutil.copyfile(f'{root}/{file_name}.csv', f'{dis_dir}/{file_name}.txt')
-                # data = ""
-                # with open(f'{root}/{file_name}.csv', 'r') as csvfile: 
-                #     csvFile = csv.DictReader(csvfile)
-                #     for lines in csvFile:
-                #         data += str(lines)
-                #         data += '\n'
-                # with open(f'{dis_dir}/{file_name}.txt', 'w', encoding='utf-8') as f:
-                #     f.write(data)
 
 def main():
     Path(PARSED_DIRECTORY).mkdir(parents=True, exist_ok=True)
@@ -95,20 +116,19 @@ def main():
             file_name = os.path.splitext(file)[0]
             source_file_path = os.path.join(root, file)
 
-            img_path = f'{PARSED_DIRECTORY}/{file_name}/page_imgs'
-            Path(img_path).mkdir(parents=True, exist_ok=True)
-            pdf_to_img(source_file_path, img_path)
+            # img_path = f'{PARSED_DIRECTORY}/{file_name}/page_imgs'
+            # Path(img_path).mkdir(parents=True, exist_ok=True)
+            # pdf_to_img(source_file_path, img_path)
 
             table_path = f'{PARSED_DIRECTORY}/{file_name}/tables'
             Path(table_path).mkdir(parents=True, exist_ok=True)
-            img_to_table(img_path, table_path)
+            # img_to_table(img_path, table_path)
 
             paragraph_path = f'{PARSED_DIRECTORY}/{file_name}/paragraphs'
             Path(paragraph_path).mkdir(parents=True, exist_ok=True)
-            text_to_chunk(source_file_path, paragraph_path)
-            table_to_chunk(table_path, paragraph_path)
-  
-       
+            table_to_txt(table_path, table_path)
+            text_to_chunk(source_file_path, table_path, paragraph_path)
+
             
 
 if __name__ == "__main__":
