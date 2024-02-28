@@ -11,8 +11,8 @@ import pdfplumber
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 #ROOT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-ROOT_DIRECTORY = '/home/joyce/localGPT/PDFParser'
-SOURCE_DIRECTORY = '/home/joyce/localGPT/SOURCE_DOCUMENTS'
+ROOT_DIRECTORY = '/home/chsieh/joyce/localGPT/PDFParser'
+SOURCE_DIRECTORY = '/home/chsieh/joyce/localGPT/SOURCE_DOCUMENTS'
 PARSED_DIRECTORY = f'{os.getcwd()}/PARSED_DOCUMENTS'
 
 # Step 1: PDF to Image transformation
@@ -52,46 +52,66 @@ def text_filter(text):
                         
 def text_to_chunk(pdf_dir, table_dir, dis_dir):  
 
-    loader = PDFPlumberLoader(pdf_dir)
-    pages = loader.load_and_split()
-
-    table_list = []
+    # loader = PDFPlumberLoader(pdf_dir)
+    # pages = loader.load_and_split()
+    pdf = pdfplumber.open(pdf_dir)
+    pages = pdf.pages
+    
+    # [TODO] len(table_list) == len(pages)
+    table_list = [] 
     for root, _, files in os.walk(table_dir):
         for file in files:
             if file.split('.')[1] == 'txt':
                 table_list.append(os.path.join(root, file))
 
     chunks = []
+    added_list = []
     for page_idx in range(len(pages)):
         text = ""
         table_text, raw_text = extract_text_without_tables(pages[page_idx], page_idx+1)
+        # [TODO] save and stop here
+        
         if table_text:
+            # [TODO] no O^2
+            
             for table in table_list:
                 table_name = table.split('.')[0].split('/')[-1]
                 if table_text.find(table_name) != -1:
                     table_content = open(table, "r").read()
-                    new_text = table_text.replace("<|" + table_name + "|>", table_content)
-                    table_text = new_text
-                    table_list.remove(table)
-            text += table_text
+                    table_text = table_text.replace("<|" + table_name + "|>", "\n\n"+table_content+"\n\n")
+                    added_list.append(table)
+            chunks.append(table_text)
 
         text += raw_text
         clean_text = text_filter(text)
-
         chunks += split_contexts(clean_text, chunk_size=300, overlap=False)
+    
+    # Tables cannot be recognized by pdfplumber
+    chunks += [f"\n\n{open(table, 'r').read()}" for table in table_list if table not in added_list]
+        
+    # [str, str, str]
+    final_chunks = []
+    curr_text = ""
 
-    for i in range(1, len(chunks)):
-        concat = []
-        if len(chunks[i]) == 1 and len(chunks[i-1]) == 1:
-            texts = str(chunks[i-1]) + str(chunks[i])
-            concat = split_contexts(texts, chunk_size=300, overlap=False)
-        if len(concat) == 1:
-            chunks[i-1] = concat[0]
-            chunks[i] = ""
-            if i < len(chunks) - 1:
-                i += 1
+    for chunk in chunks:
+        if len(split_contexts(curr_text + chunk, chunk_size=300, overlap=False)) == 1:
+            curr_text += chunk
+        else:
+            final_chunks.append(curr_text)
+            curr_text = chunk
 
-    final_chunks = [c for c in chunks if c != ""]
+    final_chunks.append(curr_text)
+    
+    # for i in range(len(chunks)-1):
+    #     concat = []
+    #     texts = str(chunks[i-1]) + str(chunks[i])
+    #     concat = split_contexts(texts, chunk_size=300, overlap=False)
+    #     if len(concat) == 1:
+    #         chunks[i-1] = concat[0]
+    #         chunks[i] = ""
+    #         if i < len(chunks) - 1:
+    #             i += 1
+    # final_chunks = [c for c in chunks if c != ""]
 
     ## [TODO]
     ## 1. shrink chunk size if possible
@@ -110,6 +130,18 @@ def table_to_txt(source_dir, dis_dir):
                 shutil.copyfile(f'{root}/{file_name}.csv', f'{dis_dir}/{file_name}.txt')
 
 def main():
+    """
+     /intermediate
+       /page0
+         /table.csv
+         /raw_text.txt
+         /table_text.txt
+       /page1
+       
+    # file1.py only generate the above files
+    # file2.py replace table tags in table_text.txt with table.csv and combine raw_text.txt. Finally, split chunks.
+    """
+    
     Path(PARSED_DIRECTORY).mkdir(parents=True, exist_ok=True)
     for root, _, files in os.walk(SOURCE_DIRECTORY):
         for file in files:
@@ -123,10 +155,12 @@ def main():
             table_path = f'{PARSED_DIRECTORY}/{file_name}/tables'
             Path(table_path).mkdir(parents=True, exist_ok=True)
             # img_to_table(img_path, table_path)
-
+            
+            
+             Other file (replace and chunk)
             paragraph_path = f'{PARSED_DIRECTORY}/{file_name}/paragraphs'
             Path(paragraph_path).mkdir(parents=True, exist_ok=True)
-            table_to_txt(table_path, table_path)
+            table_to_txt(table_path, table_path) # [[str]]: [page1_tables, page2_tables, page3_tables]
             text_to_chunk(source_file_path, table_path, paragraph_path)
 
             
