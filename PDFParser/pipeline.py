@@ -131,15 +131,23 @@ def table_to_txt(source_dir, dis_dir):
 
 def main():
     """
+    # file1.py only generate the above files
+    
      /intermediate
        /page0
-         /table.csv
+         /table_0.csv
+         /table_1.csv
          /raw_text.txt
          /table_text.txt
        /page1
+       ...
        
-    # file1.py only generate the above files
     # file2.py replace table tags in table_text.txt with table.csv and combine raw_text.txt. Finally, split chunks.
+     /paragraphs
+       /chunk0.txt
+       /chunk1.txt
+       ...
+    
     """
     
     Path(PARSED_DIRECTORY).mkdir(parents=True, exist_ok=True)
