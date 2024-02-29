@@ -1,34 +1,17 @@
 import pdfplumber
 from collections import Counter
-# import nltk
-# nltk.download('punkt')
+import nltk
+nltk.download('punkt')
 from nltk.tokenize import sent_tokenize
 
-def split_contexts(context: str, chunk_size=1000, overlap=False):
-    all_chunks = []
-    chunk = []
-    num_words = 0
-    for sent in sent_tokenize(context.strip()):
-        num_words += len(sent.split())
-        chunk.append(sent)
-        if num_words >= chunk_size:
-            chunk_str = " ".join(chunk)
-            all_chunks.append(chunk_str)
+import os
+import csv
+from datetime import datetime
+from constants import EMBEDDING_MODEL_NAME
+from langchain.embeddings import HuggingFaceInstructEmbeddings
+from langchain.embeddings import HuggingFaceBgeEmbeddings
+from langchain.embeddings import HuggingFaceEmbeddings
 
-            if overlap:
-                num_words -= len(chunk[0].split())
-                chunk = chunk[1:]
-            else:
-                chunk = []
-                num_words = 0
-        
-    if len(chunk) > 0:
-        chunk_str = " ".join(chunk)
-        all_chunks.append(chunk_str)
-        chunk = []
-        num_words = 0
-        
-    return all_chunks
 
 #Parse PDFs excluding tables.
 def extract_text_without_tables(p, page_idx):
@@ -81,24 +64,78 @@ def extract_text_without_tables(p, page_idx):
             raw_texts = p.crop((0, head, p.width, p.height), relative=False, strict=True).extract_text()
         else:
             raw_texts = p.extract_text()
-            
-    # im = p.to_image()
-    # im.debug_tablefinder(ts).save('test.png')
-    # import pdb
-    # pdb.set_trace()
     
     return table_texts, raw_texts
-    
-    
-#     def not_within_bboxes(obj):
-#         """Check if the object is in any of the table's bbox."""
-#         def obj_in_bbox(_bbox):
-#             """See https://github.com/jsvine/pdfplumber/blob/stable/pdfplumber/table.py#L404"""
-#             v_mid = (obj["top"] + obj["bottom"]) / 2
-#             h_mid = (obj["x0"] + obj["x1"]) / 2
-#             x0, top, x1, bottom = _bbox
-#             return (h_mid >= x0) and (h_mid < x1) and (v_mid >= top) and (v_mid < bottom)
 
-#         return not any(obj_in_bbox(__bbox) for __bbox in bboxes)
-    
-#     return p.filter(not_within_bboxes).extract_text()
+
+def log_to_csv(question, answer):
+
+    log_dir, log_file = "local_chat_history", "qa_log.csv"
+    # Ensure log directory exists, create if not
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    # Construct the full file path
+    log_path = os.path.join(log_dir, log_file)
+
+    # Check if file exists, if not create and write headers
+    if not os.path.isfile(log_path):
+        with open(log_path, mode="w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(["timestamp", "question", "answer"])
+
+    # Append the log entry
+    with open(log_path, mode="a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        writer.writerow([timestamp, question, answer])
+
+
+def get_embeddings(device_type="cuda"):
+    if "instructor" in EMBEDDING_MODEL_NAME:
+        return HuggingFaceInstructEmbeddings(
+            model_name=EMBEDDING_MODEL_NAME,
+            model_kwargs={"device": device_type},
+            embed_instruction="Represent the document for retrieval:",
+            query_instruction="Represent the question for retrieving supporting documents:",
+        )
+
+    elif "bge" in EMBEDDING_MODEL_NAME:
+        return HuggingFaceBgeEmbeddings(
+            model_name=EMBEDDING_MODEL_NAME,
+            model_kwargs={"device": device_type},
+            query_instruction="Represent this sentence for searching relevant passages:",
+        )
+
+    else:
+        return HuggingFaceEmbeddings(
+            model_name=EMBEDDING_MODEL_NAME,
+            model_kwargs={"device": device_type},
+        )
+
+
+def split_contexts(context: str, chunk_size=1000, overlap=False):
+    all_chunks = []
+    chunk = []
+    num_words = 0
+    for sent in sent_tokenize(context.strip()):
+        num_words += len(sent.split())
+        chunk.append(sent)
+        if num_words >= chunk_size:
+            chunk_str = " ".join(chunk)
+            all_chunks.append(chunk_str)
+
+            if overlap:
+                num_words -= len(chunk[0].split())
+                chunk = chunk[1:]
+            else:
+                chunk = []
+                num_words = 0
+        
+    if len(chunk) > 0:
+        chunk_str = " ".join(chunk)
+        all_chunks.append(chunk_str)
+        chunk = []
+        num_words = 0
+        
+    return all_chunks
