@@ -122,15 +122,15 @@ def split_contexts(context: str, chunk_size=1000, overlap=False):
         num_words += len(sent.split())
         chunk.append(sent)
         if num_words >= chunk_size:
-            chunk_str = " ".join(chunk)
+            chunk_str = " ".join(chunk[:-1])
             all_chunks.append(chunk_str)
 
             if overlap:
                 num_words -= len(chunk[0].split())
                 chunk = chunk[1:]
             else:
-                chunk = []
-                num_words = 0
+                chunk = [chunk[-1]]
+                num_words = len(chunk[0].split())
         
     if len(chunk) > 0:
         chunk_str = " ".join(chunk)

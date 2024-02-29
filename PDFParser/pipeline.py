@@ -6,7 +6,8 @@ from pdf_prep import pdf_prep
 from chunk_prep import text_to_chunk
 from langchain.vectorstores import Chroma
 from utils import get_embeddings
-
+import uuid
+import json
 
 from constants import (
     CHROMA_SETTINGS,
@@ -65,16 +66,22 @@ def main(device_type):
             paragraph_path = f'{parsed_dir}/{file_name}/paragraphs'
             Path(paragraph_path).mkdir(parents=True, exist_ok=True)
             doc_list += text_to_chunk(table_dict, text_dict, paragraph_path)
-
-    # embeddings = get_embeddings(device_type)
-    # logging.info(f"Loaded embeddings from {EMBEDDING_MODEL_NAME}")
-    # db = Chroma.from_documents(
-    #     doc_list,
-    #     embeddings,
-    #     persist_directory=PERSIST_DIRECTORY,
-    #     client_settings=CHROMA_SETTINGS,
-    # )
-
+            
+    doc_sources = [d.metadata['source'] for d in doc_list]
+    doc_ids = [str(uuid.uuid4()) for _ in range(len(doc_sources))]
+    embeddings = get_embeddings(device_type)
+    logging.info(f"Loaded embeddings from {EMBEDDING_MODEL_NAME}")
+    db = Chroma.from_documents(
+        doc_list,
+        embeddings,
+        persist_directory=PERSIST_DIRECTORY,
+        client_settings=CHROMA_SETTINGS,
+        ids=doc_ids,
+    )
+    
+    with open(f'{PERSIST_DIRECTORY}/mapping.json', 'w') as f:
+        json.dump({source:_id  for _id, source in zip(doc_ids, doc_sources)}, f, indent=4)
+    
 if __name__ == "__main__":
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s - %(message)s", level=logging.INFO
